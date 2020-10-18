@@ -1,0 +1,105 @@
+*&---------------------------------------------------------------------*
+*& Report Z_XML3
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT z_xml3.
+
+DATA: l_filename  TYPE string,
+      l_path      TYPE string,
+      l_fullpath  TYPE string,
+      l_xml_final TYPE string,
+      l_localfile TYPE localfile.
+
+DATA: lt_xml TYPE TABLE OF string.
+
+SELECT * FROM scarr
+  INTO TABLE @DATA(lt_scarr)
+  UP TO 2 ROWS.
+
+DATA(out) = cl_demo_output=>new( )->begin_section( `XML-Data` ).
+
+
+DATA(xml_head) =  `<?xml version="1.0"?>` &&
+     `<order number="4711"` &&
+     ` xmlns:demo="http://www.sap.com/abapdemos">` &&
+     `<!-- Head and body of order -->` .
+
+APPEND xml_head TO lt_xml.
+
+*LOOP AT lt_scarr INTO DATA(ls_scarr).
+*
+*  DATA(xml_body) =
+*
+*     `<demo:head>` &&
+*     `<demo:Kurzbezeichnung_Fluggesellschaft>` && ls_scarr-carrid  && `</demo:Kurzbezeichnung_Fluggesellschaft>` &&
+*     `<demo:date format="mm-dd-yyyy">` && sy-datum && `</demo:date>` &&
+*     `</demo:head>` &&
+*     `<demo:body>`  &&
+*     `<demo:Name_Fluggesellschaft>` && ls_scarr-carrname && `</demo:Name_Fluggesellschaft>` &&
+*     `<demo:Hauswaehrung>` && ls_scarr-currcode && `</demo:Hauswaehrung>` &&
+*     `<demo:URL>` && ls_scarr-url && `</demo:URL>` &&
+*     `</demo:body>` .
+*
+*  APPEND xml_body TO lt_xml.
+*
+*ENDLOOP.
+
+DATA(xml_patient) = '<patient>' &&
+   '<age>53</age>' &&
+   '<sex>1</sex>' &&
+   '<pregnancy>2</pregnancy>' &&
+   '<asa>1</asa>' &&
+   '<anticoagulation>1</anticoagulation>' &&
+   '<anticoagulants>' &&
+   '<plateletAggregationInhibitors>1</plateletAggregationInhibitors>' &&
+   '</anticoagulants>' &&
+   '</patient>'.
+
+APPEND xml_patient TO lt_xml.
+
+DATA(xml_fuss) =   `</order>`.
+
+APPEND xml_fuss TO lt_xml.
+
+DATA: xml_out TYPE string.
+
+LOOP AT lt_xml INTO DATA(xml_body).
+
+  CONCATENATE xml_out xml_body INTO xml_out.
+
+ENDLOOP.
+
+out->write_xml( xml_out ).
+
+DATA(ixml)          = cl_ixml=>create( ).
+*
+DATA(document)      = ixml->create_document( ).
+
+CALL TRANSFORMATION id
+SOURCE data = xml_out
+      RESULT XML document.
+
+out->display( ).
+
+CALL METHOD cl_gui_frontend_services=>file_save_dialog
+  CHANGING
+    filename = l_filename
+    fullpath = l_fullpath
+    path     = l_path
+  EXCEPTIONS
+    OTHERS   = 1.
+IF sy-subrc NE 0.
+  MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+             WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+ENDIF.
+
+*XML-String in XML-Document wandeln
+DATA(lr_xml_doc) = NEW cl_xml_document( ).
+
+lr_xml_doc->parse_string( xml_out ).
+
+l_localfile = l_fullpath.
+
+*XML-Document als Datei speichern
+lr_xml_doc->export_to_file( l_localfile ).
