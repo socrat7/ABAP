@@ -1,0 +1,73 @@
+*&---------------------------------------------------------------------*
+*& Report Z_XML3
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT z_xml4.
+
+DATA: l_filename  TYPE string,
+      l_path      TYPE string,
+      l_fullpath  TYPE string,
+      l_xml_final TYPE string,
+      l_localfile TYPE localfile.
+
+DATA: lt_xml TYPE TABLE OF string.
+
+DATA(out) = cl_demo_output=>new( )->begin_section( `XML-Data` ).
+
+DATA(xml_head) =  `<Head>` .
+
+DATA(num) = 1.
+
+APPEND xml_head TO lt_xml.
+DO 200 TIMES.
+  DATA(xml_patient) = '<patient>' &&
+     '<age>' && num && '</age>' &&
+     '<sex>1</sex>' &&
+     '<pregnancy>2</pregnancy>' &&
+     '<asa>1</asa>' &&
+     '<anticoagulation>1</anticoagulation>' &&
+     '<anticoagulants>' &&
+     '<plateletAggregationInhibitors>1</plateletAggregationInhibitors>' &&
+     '</anticoagulants>' &&
+     '</patient>'.
+  ADD 1 TO num.
+  APPEND xml_patient TO lt_xml.
+ENDDO.
+
+DATA(xml_fuss) =   `</Head>`.
+
+APPEND xml_fuss TO lt_xml.
+
+DATA: xml_out TYPE string.
+
+LOOP AT lt_xml INTO DATA(xml_body).
+
+  CONCATENATE xml_out xml_body INTO xml_out.
+
+ENDLOOP.
+
+out->write_xml( xml_out ).
+out->display( ).
+
+CALL METHOD cl_gui_frontend_services=>file_save_dialog
+  CHANGING
+    filename = l_filename
+    fullpath = l_fullpath
+    path     = l_path
+  EXCEPTIONS
+    OTHERS   = 1.
+IF sy-subrc NE 0.
+  MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+             WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+ENDIF.
+
+*XML-String in XML-Document wandeln
+DATA(lr_xml_doc) = NEW cl_xml_document( ).
+
+lr_xml_doc->parse_string( xml_out ).
+
+l_localfile = l_fullpath.
+
+*XML-Document als Datei speichern
+lr_xml_doc->export_to_file( l_localfile ).
